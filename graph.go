@@ -15,6 +15,7 @@ func (e *NodeNotFoundErr[K]) Error() string {
 }
 
 // Graph contains all the nodes and edges
+// where K is the key type and T is the node type
 type Graph[K comparable, T any] struct {
 	nodes map[K]T
 	edges map[K][]K
@@ -128,6 +129,12 @@ type path[K comparable] struct {
 func (g *Graph[K, T]) ShortestPath(start K, end K) ([]T, error) {
 	queue := deque.New[path[K]]()
 	queue.PushBack(path[K]{nodeKey: start, prev: nil})
+
+	// Check if end node exist
+	_, err := g.GetNode(end)
+	if err != nil {
+		return nil, err
+	}
 
 	visited := map[K]bool{}
 	for queue.Len() != 0 {

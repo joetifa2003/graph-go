@@ -28,7 +28,7 @@ func TestGraphEdges(t *testing.T) {
 	err = g.AddEdge(2, 1)
 	assert.Nil(err)
 	err = g.AddEdge(2, 1) // duplicate edge
-	assert.Error(err)
+	assert.Nil(err)
 	err = g.AddEdge(69, 145) // none existing node
 	assert.Equal(err.Error(), (&graph.NodeNotFoundErr[int]{Key: 69}).Error())
 	assert.Error(err)
@@ -120,12 +120,12 @@ func TestUndirectedEdge(t *testing.T) {
 	assert.Equal(1, len(node2Edges))
 
 	err = g.AddUndirectedEdge(1, 2) // already defined
-	assert.Error(err)
+	assert.Nil(err)
 
 	err = g.AddUndirectedEdge(3, 1) // already defined
-	assert.Error(err)
+	assert.Nil(err)
 	err = g.AddUndirectedEdge(1, 3) // already defined
-	assert.Error(err)
+	assert.Nil(err)
 
 	err = g.AddUndirectedEdge(1, 145) // non existing nodes
 	assert.Error(err)
