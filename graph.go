@@ -17,14 +17,16 @@ func (e *NodeNotFoundErr[K]) Error() string {
 // Graph contains all the nodes and edges
 // where K is the key type and T is the node type
 type Graph[K comparable, T any] struct {
-	nodes map[K]T
-	edges map[K][]K
+	nodes         map[K]T
+	edges         map[K][]K
+	edgesMetaData map[K]map[K]interface{}
 }
 
 func NewGraph[K comparable, T any]() Graph[K, T] {
 	return Graph[K, T]{
-		nodes: map[K]T{},
-		edges: map[K][]K{},
+		nodes:         map[K]T{},
+		edges:         map[K][]K{},
+		edgesMetaData: map[K]map[K]interface{}{},
 	}
 }
 
@@ -40,19 +42,12 @@ func (g *Graph[K, T]) GetEdges(key K) ([]K, error) {
 		return nil, &NodeNotFoundErr[K]{Key: key}
 	}
 
-	edges, ok := g.edges[key]
-	if ok {
-		return edges, nil
-	}
-
-	g.edges[key] = []K{}
-
 	return g.edges[key], nil
 }
 
 // AddEdge adds a directed edge between A and B (A -> B)
 // If A already have B edge it will do nothing
-func (g *Graph[K, T]) AddEdge(keyA K, keyB K) error {
+func (g *Graph[K, T]) AddEdge(keyA K, keyB K, metadata interface{}) error {
 	nodeAEdges, err := g.GetEdges(keyA)
 	if err != nil {
 		return err
@@ -61,32 +56,38 @@ func (g *Graph[K, T]) AddEdge(keyA K, keyB K) error {
 	if !edgeAlreadyPresent(nodeAEdges, keyB) {
 		nodeAEdges = append(nodeAEdges, keyB)
 		g.edges[keyA] = nodeAEdges
+		if metadata != nil {
+			g.SetMetaData(keyA, keyB, metadata)
+		}
 	}
 
 	return nil
 }
 
+func (g *Graph[K, T]) SetMetaData(keyA K, keyB K, metadata interface{}) {
+	if g.edgesMetaData[keyA] == nil {
+		g.edgesMetaData[keyA] = map[K]interface{}{}
+	}
+
+	g.edgesMetaData[keyA][keyB] = metadata
+}
+
+func (g *Graph[K, T]) SetUndirectedMetaData(keyA K, keyB K, metadata interface{}) {
+	g.SetMetaData(keyA, keyB, metadata)
+	g.SetMetaData(keyB, keyA, metadata)
+}
+
 // AddUndirectedEdge adds an undirected edge between A and B (A <-> B)
 // If A already have B edge or B already have A edge it will do nothing
-func (g *Graph[K, T]) AddUndirectedEdge(keyA K, keyB K) error {
-	nodeAEdges, err := g.GetEdges(keyA)
+func (g *Graph[K, T]) AddUndirectedEdge(keyA K, keyB K, metadata interface{}) error {
+	err := g.AddEdge(keyA, keyB, metadata)
 	if err != nil {
 		return err
 	}
 
-	nodeBEdges, err := g.GetEdges(keyB)
+	err = g.AddEdge(keyB, keyA, metadata)
 	if err != nil {
 		return err
-	}
-
-	if !edgeAlreadyPresent(nodeAEdges, keyB) {
-		nodeAEdges = append(nodeAEdges, keyB)
-		g.edges[keyA] = nodeAEdges
-	}
-
-	if !edgeAlreadyPresent(nodeBEdges, keyA) {
-		nodeBEdges = append(nodeBEdges, keyA)
-		g.edges[keyB] = nodeBEdges
 	}
 
 	return nil
@@ -107,7 +108,14 @@ func (g *Graph[K, T]) RemoveEdge(key K, edge K) error {
 		}
 	}
 
+	delete(g.edgesMetaData[key], edge)
+
 	return fmt.Errorf("node key %+v doesn't have the edge %+v", key, edge)
+}
+
+func (g *Graph[K, T]) RemoveUndirectedEdge(keyA K, keyB K) {
+	g.RemoveEdge(keyA, keyB)
+	g.RemoveEdge(keyB, keyA)
 }
 
 // GetNode gets node T from key K
@@ -118,6 +126,16 @@ func (g *Graph[K, T]) GetNode(key K) (node T, err error) {
 	}
 
 	return node, &NodeNotFoundErr[K]{Key: key}
+}
+
+// Gets the meta data between A -> B edge
+func (g *Graph[K, T]) GetMetaData(keyA K, keyB K) interface{} {
+	metadata, ok := g.edgesMetaData[keyA][keyB]
+	if ok {
+		return metadata
+	}
+
+	return nil
 }
 
 type path[K comparable] struct {

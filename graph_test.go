@@ -23,13 +23,13 @@ func TestGraphEdges(t *testing.T) {
 	g := graph.NewGraph[int, string]()
 	g.SetNode(1, "Node 1")
 	g.SetNode(2, "Node 2")
-	err := g.AddEdge(1, 2)
+	err := g.AddEdge(1, 2, nil)
 	assert.Nil(err)
-	err = g.AddEdge(2, 1)
+	err = g.AddEdge(2, 1, nil)
 	assert.Nil(err)
-	err = g.AddEdge(2, 1) // duplicate edge
+	err = g.AddEdge(2, 1, nil) // duplicate edge
 	assert.Nil(err)
-	err = g.AddEdge(69, 145) // none existing node
+	err = g.AddEdge(69, 145, nil) // none existing node
 	assert.Equal(err.Error(), (&graph.NodeNotFoundErr[int]{Key: 69}).Error())
 	assert.Error(err)
 
@@ -65,26 +65,29 @@ func TestShortestPath(t *testing.T) {
 
 	g := graph.NewGraph[int, string]()
 	g.SetNode(1, "Node 1")
+	edges, err := g.GetEdges(1)
+	assert.Nil(err)
+	assert.Equal(0, len(edges))
 	g.SetNode(2, "Node 2")
 	g.SetNode(3, "Node 3")
 	g.SetNode(4, "Node 4")
 	g.SetNode(5, "Node 5")
 	g.SetNode(6, "Node 6")
-	err := g.AddEdge(1, 2)
+	err = g.AddEdge(1, 2, nil)
 	assert.Nil(err)
-	err = g.AddEdge(2, 1)
+	err = g.AddEdge(2, 1, nil)
 	assert.Nil(err)
-	err = g.AddEdge(2, 3)
+	err = g.AddEdge(2, 3, nil)
 	assert.Nil(err)
-	err = g.AddEdge(3, 2)
+	err = g.AddEdge(3, 2, nil)
 	assert.Nil(err)
-	err = g.AddEdge(3, 4)
+	err = g.AddEdge(3, 4, nil)
 	assert.Nil(err)
-	err = g.AddEdge(3, 1)
+	err = g.AddEdge(3, 1, nil)
 	assert.Nil(err)
-	err = g.AddEdge(4, 3)
+	err = g.AddEdge(4, 3, nil)
 	assert.Nil(err)
-	err = g.AddEdge(4, 5)
+	err = g.AddEdge(4, 5, nil)
 	assert.Nil(err)
 
 	path1, err := g.ShortestPath(1, 4)
@@ -106,9 +109,9 @@ func TestUndirectedEdge(t *testing.T) {
 	g.SetNode(1, "Node 1")
 	g.SetNode(2, "Node 2")
 	g.SetNode(3, "Node 3")
-	g.AddEdge(3, 1)
+	g.AddEdge(3, 1, nil)
 
-	err := g.AddUndirectedEdge(1, 2)
+	err := g.AddUndirectedEdge(1, 2, nil)
 	assert.Nil(err)
 
 	node1Edges, err := g.GetEdges(1)
@@ -119,18 +122,18 @@ func TestUndirectedEdge(t *testing.T) {
 	assert.Nil(err)
 	assert.Equal(1, len(node2Edges))
 
-	err = g.AddUndirectedEdge(1, 2) // already defined
+	err = g.AddUndirectedEdge(1, 2, nil) // already defined
 	assert.Nil(err)
 
-	err = g.AddUndirectedEdge(3, 1) // already defined
+	err = g.AddUndirectedEdge(3, 1, nil) // already defined
 	assert.Nil(err)
-	err = g.AddUndirectedEdge(1, 3) // already defined
+	err = g.AddUndirectedEdge(1, 3, nil) // already defined
 	assert.Nil(err)
 
-	err = g.AddUndirectedEdge(1, 145) // non existing nodes
+	err = g.AddUndirectedEdge(1, 145, nil) // non existing nodes
 	assert.Error(err)
 
-	err = g.AddUndirectedEdge(145, 1) // non existing nodes
+	err = g.AddUndirectedEdge(145, 1, nil) // non existing nodes
 	assert.Error(err)
 }
 
@@ -155,4 +158,33 @@ func TestGetKey(t *testing.T) {
 
 	_, ok = g.GetNodeKey(func(p Person) bool { return p.age == 45 })
 	assert.False(ok)
+}
+
+type meta struct {
+	weight int
+}
+
+func TestMetaData(t *testing.T) {
+	assert := assert.New(t)
+
+	g := graph.NewGraph[int, string]()
+	g.SetNode(1, "Node 1")
+	g.SetNode(2, "Node 2")
+	g.AddEdge(1, 2, meta{weight: 15})
+
+	m := g.GetMetaData(1, 2).(meta)
+	assert.Equal(15, m.weight)
+
+	m2 := g.GetMetaData(2, 1)
+	assert.Nil(m2)
+
+	g.SetUndirectedMetaData(1, 2, meta{weight: 145})
+	m = g.GetMetaData(1, 2).(meta)
+	assert.Equal(145, m.weight)
+
+	m3 := g.GetMetaData(2, 1).(meta)
+	assert.Equal(145, m3.weight)
+
+	g.RemoveEdge(2, 1)
+	assert.Nil(g.GetMetaData(2, 1))
 }
