@@ -143,7 +143,7 @@ type path[K comparable] struct {
 	prev    *path[K]
 }
 
-// Get shortest path between two node keys using breadth first search
+// ShortestPath gets shortest path between two node keys using breadth first search
 func (g *Graph[K, T]) ShortestPath(start K, end K) ([]T, error) {
 	queue := deque.New[path[K]]()
 	queue.PushBack(path[K]{nodeKey: start, prev: nil})
@@ -157,14 +157,9 @@ func (g *Graph[K, T]) ShortestPath(start K, end K) ([]T, error) {
 	visited := map[K]bool{}
 	for queue.Len() != 0 {
 		p := queue.PopFront()
-		if _, ok := visited[p.nodeKey]; ok {
-			continue
-		}
-
-		visited[p.nodeKey] = true
 
 		if p.nodeKey == end {
-			return g.pathToArrayOfNodes(p), nil
+			return g.pathToArrayOfNodes(&p), nil
 		}
 
 		nodeEdges, err := g.GetEdges(p.nodeKey)
@@ -173,11 +168,66 @@ func (g *Graph[K, T]) ShortestPath(start K, end K) ([]T, error) {
 		}
 
 		for _, edge := range nodeEdges {
-			queue.PushBack(path[K]{nodeKey: edge, prev: &p})
+			if _, ok := visited[edge]; !ok {
+				queue.PushBack(path[K]{nodeKey: edge, prev: &p})
+				visited[edge] = true
+			}
 		}
 	}
 
 	return []T{}, nil
+}
+
+// MultiShortestPath is the same as ShortestPath but returns multiple paths
+// and can have a maximum number of paths or -1 for all possible paths
+func (g *Graph[K, T]) MultiShortestPath(start K, end K, maxPaths int) ([][]T, error) {
+	res := [][]T{}
+
+	queue := deque.New[path[K]]()
+	queue.PushBack(path[K]{nodeKey: start, prev: nil})
+
+	// Check if end node exist
+	_, err := g.GetNode(end)
+	if err != nil {
+		return nil, err
+	}
+
+	for queue.Len() != 0 {
+		if maxPaths != -1 && len(res) == maxPaths {
+			break
+		}
+
+		p := queue.PopFront()
+
+		if p.nodeKey == end {
+			res = append(res, g.pathToArrayOfNodes(&p))
+		}
+
+		nodeEdges, err := g.GetEdges(p.nodeKey)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, edge := range nodeEdges {
+			if !checkVisited(&p, edge) {
+				queue.PushBack(path[K]{nodeKey: edge, prev: &p})
+			}
+		}
+	}
+
+	return res, nil
+}
+
+func checkVisited[K comparable](p *path[K], k K) bool {
+	for p != nil {
+		if p.nodeKey == k {
+			return true
+		}
+
+		p = p.prev
+	}
+
+	return false
 }
 
 // GetNodeKey invokes f on each node in the graph and returns a key as soon as f returns true.
@@ -207,15 +257,13 @@ func (g *Graph[K, T]) GetNodeKeys(f func(T) bool) (keys []K) {
 	return keys
 }
 
-func (g *Graph[K, T]) pathToArrayOfNodes(p path[K]) []T {
+func (g *Graph[K, T]) pathToArrayOfNodes(p *path[K]) []T {
 	nodes := []T{}
-	for p.prev != nil {
+	for p != nil {
 		node, _ := g.GetNode(p.nodeKey)
 		nodes = append(nodes, node)
-		p = *p.prev
+		p = p.prev
 	}
-	node, _ := g.GetNode(p.nodeKey)
-	nodes = append(nodes, node) // last node
 
 	// Reverse nodes
 	reverseSlice(nodes)
