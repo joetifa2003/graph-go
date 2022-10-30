@@ -5,7 +5,6 @@ go 1.19
 require (
 	github.com/gammazero/deque v0.2.0
 	github.com/stretchr/testify v1.8.0
-	golang.org/x/exp v0.0.0-20221028150844-83b7d23a625f
 )
 
 require (
