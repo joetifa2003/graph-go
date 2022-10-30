@@ -2,6 +2,7 @@ package graph
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/gammazero/deque"
 )
@@ -20,6 +21,7 @@ type Graph[K comparable, T any] struct {
 	nodes         map[K]T
 	edges         map[K][]K
 	edgesMetaData map[K]map[K]interface{}
+	edgesPriority map[K]map[K]int
 }
 
 func NewGraph[K comparable, T any]() Graph[K, T] {
@@ -27,6 +29,7 @@ func NewGraph[K comparable, T any]() Graph[K, T] {
 		nodes:         map[K]T{},
 		edges:         map[K][]K{},
 		edgesMetaData: map[K]map[K]interface{}{},
+		edgesPriority: map[K]map[K]int{},
 	}
 }
 
@@ -43,25 +46,6 @@ func (g *Graph[K, T]) GetEdges(key K) ([]K, error) {
 	}
 
 	return g.edges[key], nil
-}
-
-// AddEdge adds a directed edge between A and B (A -> B)
-// If A already have B edge it will do nothing
-func (g *Graph[K, T]) AddEdge(keyA K, keyB K, metadata interface{}) error {
-	nodeAEdges, err := g.GetEdges(keyA)
-	if err != nil {
-		return err
-	}
-
-	if !edgeAlreadyPresent(nodeAEdges, keyB) {
-		nodeAEdges = append(nodeAEdges, keyB)
-		g.edges[keyA] = nodeAEdges
-		if metadata != nil {
-			g.SetMetaData(keyA, keyB, metadata)
-		}
-	}
-
-	return nil
 }
 
 func (g *Graph[K, T]) SetMetaData(keyA K, keyB K, metadata interface{}) {
@@ -91,6 +75,46 @@ func (g *Graph[K, T]) AddUndirectedEdge(keyA K, keyB K, metadata interface{}) er
 	}
 
 	return nil
+}
+
+// AddEdge adds a directed edge between A and B (A -> B)
+// If A already have B edge it will do nothing
+func (g *Graph[K, T]) AddEdge(keyA K, keyB K, metadata interface{}) error {
+	nodeAEdges, err := g.GetEdges(keyA)
+	if err != nil {
+		return err
+	}
+
+	if !edgeAlreadyPresent(nodeAEdges, keyB) {
+		nodeAEdges = append(nodeAEdges, keyB)
+		g.edges[keyA] = nodeAEdges
+		if metadata != nil {
+			g.SetMetaData(keyA, keyB, metadata)
+		}
+	}
+
+	return nil
+}
+
+func (g *Graph[K, T]) SetPriority(keyA K, keyB K, priority int) {
+	if g.edgesPriority[keyA] == nil {
+		g.edgesPriority[keyA] = map[K]int{}
+	}
+
+	g.edgesPriority[keyA][keyB] = priority
+}
+
+func (g *Graph[K, T]) GetPriority(keyA K, keyB K) int {
+	if g.edgesPriority[keyA] == nil {
+		g.edgesPriority[keyA] = map[K]int{}
+	}
+
+	p, ok := g.edgesPriority[keyA][keyB]
+	if ok {
+		return p
+	}
+
+	return 0
 }
 
 // RemoveEdge removes an edge (another node with a key K) from the node with a key K
@@ -167,6 +191,10 @@ func (g *Graph[K, T]) ShortestPath(start K, end K) ([]T, error) {
 			return nil, err
 		}
 
+		sort.Slice(nodeEdges, func(i, j int) bool {
+			return g.GetPriority(p.nodeKey, nodeEdges[i]) > g.GetPriority(p.nodeKey, nodeEdges[j])
+		})
+
 		for _, edge := range nodeEdges {
 			if _, ok := visited[edge]; !ok {
 				queue.PushBack(path[K]{nodeKey: edge, prev: &p})
@@ -207,6 +235,10 @@ func (g *Graph[K, T]) MultiShortestPath(start K, end K, maxPaths int) ([][]T, er
 		if err != nil {
 			return nil, err
 		}
+
+		sort.Slice(nodeEdges, func(i, j int) bool {
+			return g.GetPriority(p.nodeKey, nodeEdges[i]) > g.GetPriority(p.nodeKey, nodeEdges[j])
+		})
 
 		for _, edge := range nodeEdges {
 			if !checkVisited(&p, edge) {
